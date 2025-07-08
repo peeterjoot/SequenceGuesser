@@ -72,6 +72,10 @@ def train_model(epochs):
         (1.8, 2.5, 1, 2),  # Slightly smaller coefficients
         (2.2, 2.8, 1, 2),  # Slightly different coefficients
         (2, 3, 2, 3),      # Same coefficients, larger start
+        #(1, 1, 1, 1),      # Fibonacci
+        #(1, 1, 0, 1),      # Fibonacci starting from 0,1
+        (1, 1, 2, 3),      # Fibonacci starting from 2,3
+        (1, 1, 1, 2),      # Fibonacci starting from 1,2
     ]
 
     for alpha, beta, a, b in params:
