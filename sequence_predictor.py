@@ -153,20 +153,20 @@ def test_model(model, X_mean, X_std, y_mean, y_std):
             # Make prediction
             pred_norm = model(input_tensor)
             pred_log = pred_norm.item() * y_std + y_mean
-            pred = np.exp(pred_log)  # Transform back from log space
+            pred = float(np.exp(pred_log))  # Convert to regular float
             
             predictions.append(pred)
     
-    print(f"Predicted:    {[round(x, 1) for x in predictions]}")
+    print(f"Predicted:    {[round(float(x), 1) for x in predictions]}")
     
     # Calculate relative errors (better for exponentially growing sequences)
     relative_errors = []
     for true, pred in zip(test_sequence, predictions):
         if true != 0:
             rel_error = abs(true - pred) / true * 100
-            relative_errors.append(rel_error)
+            relative_errors.append(float(rel_error))
         else:
-            relative_errors.append(0)
+            relative_errors.append(0.0)
     
     print(f"Relative Error (%): {[round(x, 1) for x in relative_errors]}")
 
