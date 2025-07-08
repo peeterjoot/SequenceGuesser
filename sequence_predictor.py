@@ -225,6 +225,7 @@ def parse_params(value):
         if len(params) != 4:
             raise argparse.ArgumentTypeError(f"Expected 4 parameters (alpha,beta,a,b), got {len(params)}")
 
+        alpha, beta, a, b = params
         if alpha == 0 and beta == 0:
             raise argparse.ArgumentTypeError("Both alpha and beta cannot be zero")
 
