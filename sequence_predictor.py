@@ -177,14 +177,17 @@ def test_model(model, X_mean, X_std, y_mean, y_std, alpha, beta, a, b):
 
 def visualize_training(losses):
     """Plot training loss"""
-    plt.figure(figsize=(10, 6))
-    plt.plot(losses)
-    plt.title('Training Loss Over Time')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.yscale('log')
-    plt.grid(True)
-    plt.show()
+    try:
+        plt.figure(figsize=(10, 6))
+        plt.plot(losses)
+        plt.title('Training Loss Over Time')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.yscale('log')
+        plt.grid(True)
+        plt.show()
+    except Exception as e:
+        print(f"Could not display plot: {e}")
 
 def load_model(model_file):
     """Load the saved model and normalization parameters"""
@@ -221,7 +224,12 @@ def parse_params(value):
         params = [float(x.strip()) for x in value.split(',')]
         if len(params) != 4:
             raise argparse.ArgumentTypeError(f"Expected 4 parameters (alpha,beta,a,b), got {len(params)}")
+
+        if alpha == 0 and beta == 0:
+            raise argparse.ArgumentTypeError("Both alpha and beta cannot be zero")
+
         return params
+
     except ValueError as e:
         raise argparse.ArgumentTypeError(f"Invalid parameters: {value} - {e}")
 
@@ -239,13 +247,21 @@ if __name__ == "__main__":
     #parser.add_argument('--verbose', action='store_true',
     #                   help='Enable verbose output')
     parser.add_argument('--params', type=parse_params, default=[2, 3, 1, 2],
-                   help='Sequence parameters: alpha,beta,a,b (default: 2,3,1,2)')
+                   help='Sequence parameters: alpha,beta,a,b (default: 2,3,1,2)\n' +
+                        'Examples: --params 1.5,2.5,1,3 or --params "2.2, 3.8, 0, 1"')
 
     # Other parameters
     parser.add_argument('--epochs', type=int, default=2000,
                        help='Number of training epochs')
     parser.add_argument('--model-file', type=str, default='model.pth',
                        help='Model file path')
+
+    parser.add_argument('--list-examples', action='store_true',
+                   help='Show example parameter combinations')
+
+    parser.add_argument('--force-retrain', action='store_true',
+                       help='Force retraining even if model file exists')
+
     args = parser.parse_args()
 
     # Handle conflicting options
@@ -256,9 +272,17 @@ if __name__ == "__main__":
     print("Learning recurrence relations: f_k = α*f_{k-1} + β*f_{k-2}")
     print()
 
+    if args.list_examples:
+        print("Interesting parameter combinations:")
+        print("  Fibonacci-like: --params 1,1,1,1")
+        print("  Exponential growth: --params 2,3,1,2")
+        print("  Oscillating: --params 1,-1,1,2")
+        print("  Geometric-like: --params 2,0,1,2")
+        sys.exit(0)
+
     losses = None
 
-    if os.path.isfile(args.model_file):
+    if os.path.isfile(args.model_file) and not args.force_retrain:
         model, X_mean, X_std, y_mean, y_std = load_model(args.model_file)
     else:
         # Train the model

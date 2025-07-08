@@ -24,6 +24,24 @@ Predicted:    [1.0, 1.0, 7.8, 21.9, 78.1, 230.2, 569.9, 1343.8, 2745.9, 5254.3]
 Relative Error (%): [0.0, 0.0, 290.2, 631.6, 1462.7, 2777.9, 4283.7, 6299.0, 7976.0, 9453.2]
 ```
 
+Examples:
+```
+# Use default parameters (2,3,1,2)
+./sequence_predictor.py
+
+# Test Fibonacci-like sequence
+./sequence_predictor.py --params 1,1,1,1
+
+# Test with visualization
+./sequence_predictor.py --params 1.5,2.5,0,1 --visualize
+
+# Force retraining with custom parameters
+./sequence_predictor.py --params 3,1,2,1 --force-retrain --epochs 3000
+
+# Test without saving
+./sequence_predictor.py --params 2,2,1,1 --no-save
+```
+
 ### Fedora 42:
 
 ```
