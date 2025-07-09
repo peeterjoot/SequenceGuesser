@@ -36,7 +36,7 @@ class SequencePredictor(nn.Module):
         return x
 
 def generate_sequence(alpha, beta, a, b, length=12):
-    """Generate a sequence following f_k = alpha * f_{k-1} + beta * f_{k-2}"""
+    """Generate a sequence following f_k = α * f_{k-1} + β * f_{k-2}"""
     sequence = [float(a), float(b)]
     for k in range(2, length):
         next_val = alpha * sequence[k-1] + beta * sequence[k-2]
@@ -55,46 +55,63 @@ def create_dataset(sequences, window_size=2):
             y.append(seq[i+window_size])
     return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32)
 
-def train_model(epochs):
+def train_model(epochs, logTransformation):
     # Generate training data - focus on similar patterns to your example
     print("Generating training data...")
     sequences = []
 
-    # Create sequences similar to your example but with varied parameters
-    params = [
-        (2, 3, 1, 2),      # Your exact example
-        (2, 3, 0, 1),      # Same coefficients, different start
-        (2, 3, 2, 1),      # Same coefficients, swapped start
-        (2, 3, 1, 3),      # Same coefficients, different b
-        (2, 2, 1, 2),      # Similar but beta=2
-        (3, 2, 1, 2),      # Similar but alpha=3
-        (2, 4, 1, 2),      # Similar but beta=4
-        (1.8, 2.5, 1, 2),  # Slightly smaller coefficients
-        (2.2, 2.8, 1, 2),  # Slightly different coefficients
-        (2, 3, 2, 3),      # Same coefficients, larger start
-        #(1, 1, 1, 1),      # Fibonacci
-        #(1, 1, 0, 1),      # Fibonacci starting from 0,1
-        (1, 1, 2, 3),      # Fibonacci starting from 2,3
-        (1, 1, 1, 2),      # Fibonacci starting from 1,2
-    ]
+    if logTransformation:
+        params = [
+            (2, 3, 1, 2),      # Your exact example
+            (2, 3, 0, 1),      # Same coefficients, different start
+            (2, 3, 2, 1),      # Same coefficients, swapped start
+            (2, 3, 1, 3),      # Same coefficients, different b
+            (2, 2, 1, 2),      # Similar but β=2
+            (3, 2, 1, 2),      # Similar but α=3
+            (2, 4, 1, 2),      # Similar but β=4
+            (1.8, 2.5, 1, 2),  # Slightly smaller coefficients
+            (2.2, 2.8, 1, 2),  # Slightly different coefficients
+            (2, 3, 2, 3),      # Same coefficients, larger start
+        ]
+    else:
+        params = [
+            (0.8, 0.9, 1, 2),
+            (0.8, 0.9, 0, 1),
+            (0.8, 0.9, 2, 1),
+            (0.8, 0.9, 1, 3),
+            (0.8, 0.9, 1, 2),
+            (1.05, 0.9, 1, 2),
+            (0.8, 0.9, 1, 2),
+            (0.7, 1.0, 1, 2),
+            (0.8, 0.7, 1, 2),
+            (0.8, 0.9, 2, 3),
+            #(1, 1, 1, 1),      # Fibonacci
+            #(1, 1, 0, 1),      # Fibonacci starting from 0,1
+            (1, 1, 2, 3),      # Fibonacci starting from 2,3
+            (1, 1, 1, 2),      # Fibonacci starting from 1,2
+        ]
 
     for alpha, beta, a, b in params:
         seq = generate_sequence(alpha, beta, a, b, length=10)
         if len(seq) >= 5:  # Need at least 5 points for training
             sequences.append(seq)
-            print(f"α={alpha}, β={beta}: {seq}")
+            print(f"α={alpha}, β={beta}, a={a}, b={b}: {seq}")
 
     # Create dataset
     X, y = create_dataset(sequences)
     print(f"\nDataset created: {len(X)} training examples")
 
     # Use log transformation to handle large values
-    X_log = np.log(np.maximum(X, 1e-8))  # Avoid log(0)
-    y_log = np.log(np.maximum(y, 1e-8))
+    if logTransformation:
+        X_log = np.log(np.maximum(X, 1e-8))  # Avoid log(0)
+        y_log = np.log(np.maximum(y, 1e-8))
 
-    # Normalize in log space
-    X_mean, X_std = X_log.mean(), X_log.std()
-    y_mean, y_std = y_log.mean(), y_log.std()
+        # Normalize in log space
+        X_mean, X_std = X_log.mean(), X_log.std()
+        y_mean, y_std = y_log.mean(), y_log.std()
+    else:
+        X_mean, X_std = X.mean(), X.std()
+        y_mean, y_std = y.mean(), y.std()
 
     # Avoid division by zero
     if X_std == 0:
@@ -102,8 +119,16 @@ def train_model(epochs):
     if y_std == 0:
         y_std = 1.0
 
-    X_norm = (X_log - X_mean) / X_std
-    y_norm = (y_log - y_mean) / y_std
+    if logTransformation:
+        X_norm = (X_log - X_mean) / X_std
+        y_norm = (y_log - y_mean) / y_std
+    else:
+        X_norm = (X - X_mean) / X_std
+        y_norm = (y - y_mean) / y_std
+
+        # Check for any remaining NaN or inf values
+        X_norm = np.nan_to_num(X_norm, nan=0.0, posinf=1.0, neginf=-1.0)
+        y_norm = np.nan_to_num(y_norm, nan=0.0, posinf=1.0, neginf=-1.0)
 
     # Convert to PyTorch tensors
     X_tensor = torch.FloatTensor(X_norm)
@@ -135,13 +160,13 @@ def train_model(epochs):
 
     return model, X_mean, X_std, y_mean, y_std, losses
 
-def test_model(model, X_mean, X_std, y_mean, y_std, alpha, beta, a, b):
+def test_model(model, X_mean, X_std, y_mean, y_std, alpha, beta, a, b, logTransformation):
     """Test the model on your specific example"""
-    print("\nTesting on your example sequence...")
+    print(f"\nTesting on α={alpha}, β={beta}, a={a}, b={b}...")
 
-    # Your example: alpha=2, beta=3, a=1, b=2
     test_sequence = generate_sequence(alpha, beta, a, b, length=10)
-    print(f"True sequence: {test_sequence}")
+    #print(f"True sequence: {test_sequence}")
+    print("True sequence:\t\t" + "\t".join(f"{x:.1f}" for x in test_sequence))
 
     # Test predictions
     model.eval()
@@ -152,32 +177,48 @@ def test_model(model, X_mean, X_std, y_mean, y_std, alpha, beta, a, b):
             # Prepare input (last two values)
             input_vals = np.array([predictions[-2], predictions[-1]], dtype=np.float32)
 
-            # Transform to log space
-            input_log = np.log(np.maximum(input_vals, 1e-8))
+            if logTransformation:
+                # Transform to log space
+                input_log = np.log(np.maximum(input_vals, 1e-8))
+            else:
+                # Normalize input (with safety checks)
+                if X_std != 0:
+                    input_norm = (input_vals - X_mean) / X_std
+                else:
+                    input_norm = input_vals - X_mean
 
             # Normalize
-            input_norm = (input_log - X_mean) / X_std
+            if logTransformation:
+                input_norm = (input_log - X_mean) / X_std
+            else:
+                input_norm = np.nan_to_num(input_norm, nan=0.0, posinf=1.0, neginf=-1.0)
+
             input_tensor = torch.FloatTensor(input_norm).unsqueeze(0)
 
             # Make prediction
             pred_norm = model(input_tensor)
-            pred_log = pred_norm.item() * y_std + y_mean
-            pred = float(np.exp(pred_log))  # Convert to regular float
+            if logTransformation:
+                pred_log = pred_norm.item() * y_std + y_mean
+                pred = float(np.exp(pred_log))  # Convert to regular float
+            else:
+                pred = pred_norm.item() * y_std + y_mean
 
             predictions.append(pred)
 
-    print(f"Predicted:    {[round(float(x), 1) for x in predictions]}")
+    #print(f"Predicted:    {[round(float(x), 1) for x in predictions]}")
+    print("Predicted:\t\t" + "\t".join(f"{x:.1f}" for x in predictions))
 
     # Calculate relative errors (better for exponentially growing sequences)
     relative_errors = []
     for true, pred in zip(test_sequence, predictions):
         if true != 0:
-            rel_error = abs(true - pred) / true * 100
+            rel_error = (abs(true - pred) / true) * 100
             relative_errors.append(float(rel_error))
         else:
             relative_errors.append(0.0)
 
-    print(f"Relative Error (%): {[round(x, 1) for x in relative_errors]}")
+    #print(f"Relative Error (%): {[round(x, 1) for x in relative_errors]}")
+    print("Relative Error (%):\t" + "\t".join(f"{x:.1f}" for x in relative_errors))
 
 def visualize_training(losses):
     """Plot training loss"""
@@ -223,15 +264,15 @@ def load_model(model_file):
     return model, X_mean, X_std, y_mean, y_std
 
 def parse_params(value):
-    """Parse comma-separated parameters alpha,beta,a,b"""
+    """Parse comma-separated parameters α,β,a,b"""
     try:
         params = [float(x.strip()) for x in value.split(',')]
         if len(params) != 4:
-            raise argparse.ArgumentTypeError(f"Expected 4 parameters (alpha,beta,a,b), got {len(params)}")
+            raise argparse.ArgumentTypeError(f"Expected 4 parameters (α,β,a,b), got {len(params)}")
 
         alpha, beta, a, b = params
         if alpha == 0 and beta == 0:
-            raise argparse.ArgumentTypeError("Both alpha and beta cannot be zero")
+            raise argparse.ArgumentTypeError("Both α and β cannot be zero")
 
         return params
 
@@ -245,15 +286,17 @@ if __name__ == "__main__":
     # Boolean flags
     parser.add_argument('--visualize', '-v', action='store_true',
                        help='Show training loss plot')
+    parser.add_argument('--logtx', '-g', action='store_true', default=False,
+                       help='Use Log transformation')
     parser.add_argument('--save-model', action='store_true', default=True,
                        help='Save the trained model (default: True)')
     parser.add_argument('--no-save', action='store_true',
                        help='Do not save the model')
     #parser.add_argument('--verbose', action='store_true',
     #                   help='Enable verbose output')
-    parser.add_argument('--params', type=parse_params, default=[2, 3, 1, 2],
-                   help='Sequence parameters: alpha,beta,a,b (default: 2,3,1,2)\n' +
-                        'Examples: --params 1.5,2.5,1,3 or --params "2.2, 3.8, 0, 1"')
+    parser.add_argument('--params', type=parse_params, default=[1, 1, 1, 1],
+                   help='Sequence parameters: α,β,a,b (default: 1,1,1,1)\n' +
+                        'Examples: --params 0.5,0.5,1,3 or --params "0.2, 0.8, 0, 1"')
 
     # Other parameters
     parser.add_argument('--epochs', type=int, default=2000,
@@ -291,12 +334,12 @@ if __name__ == "__main__":
         model, X_mean, X_std, y_mean, y_std = load_model(args.model_file)
     else:
         # Train the model
-        model, X_mean, X_std, y_mean, y_std, losses = train_model(args.epochs)
+        model, X_mean, X_std, y_mean, y_std, losses = train_model(args.epochs, args.logtx)
         print("\nTraining complete!")
 
     # Test the model
     alpha, beta, a, b = args.params
-    test_model(model, X_mean, X_std, y_mean, y_std, alpha, beta, a, b)
+    test_model(model, X_mean, X_std, y_mean, y_std, alpha, beta, a, b, args.logtx)
 
     if losses is not None:
         # Visualize training (optional)
