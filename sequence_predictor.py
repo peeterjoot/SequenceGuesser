@@ -74,22 +74,37 @@ def train_model(epochs, logTransformation):
             (2, 3, 2, 3),      # Same coefficients, larger start
         ]
     else:
+        # Fibonacci like sequences, with different starting points.  Generated with Mathematica:
+        # Table[{RandomReal[{0.8, 1.05}], RandomReal[{0.8, 1.05}], RandomReal[{0, 2}], RandomReal[{0, 2}]}, {i, 0, 10}]
         params = [
-            (0.8, 0.9, 1, 2),
-            (0.8, 0.9, 0, 1),
-            (0.8, 0.9, 2, 1),
-            (0.8, 0.9, 1, 3),
-            (0.8, 0.9, 1, 2),
-            (1.05, 0.9, 1, 2),
-            (0.8, 0.9, 1, 2),
-            (0.7, 1.0, 1, 2),
-            (0.8, 0.7, 1, 2),
-            (0.8, 0.9, 2, 3),
-            #(1, 1, 1, 1),      # Fibonacci
-            #(1, 1, 0, 1),      # Fibonacci starting from 0,1
-            (1, 1, 2, 3),      # Fibonacci starting from 2,3
-            (1, 1, 1, 2),      # Fibonacci starting from 1,2
+            (0.861291, 0.840455, 1.75046, 0.970936),
+            (1.02614, 1.01894, 1.04782, 1.38452),
+            (0.936709, 0.904756, 1.39031, 0.583327),
+            (0.942149, 1.03861, 1.36753, 1.94342),
+            (0.984499, 0.869777, 1.3727, 0.259391),
+            (0.863729, 0.933664, 1.9683, 0.358662),
+            (0.947734, 0.967587, 0.189643, 0.290601),
+            (0.911811, 0.857173, 1.45565, 1.65682),
+            (1.00224, 0.90819, 1.1876, 0.0339141),
+            (1.00587, 0.952368, 0.969396, 0.560593),
+            (0.918202, 0.873014, 0.938231, 1.47218),
         ]
+        #params = [
+        #    (0.8, 0.9, 1, 2),
+        #    (0.8, 0.9, 0, 1),
+        #    (0.8, 0.9, 2, 1),
+        #    (0.8, 0.9, 1, 3),
+        #    (0.8, 0.9, 1, 2),
+        #    (1.05, 0.9, 1, 2),
+        #    (0.8, 0.9, 1, 2),
+        #    (0.7, 1.0, 1, 2),
+        #    (0.8, 0.7, 1, 2),
+        #    (0.8, 0.9, 2, 3),
+        #    #(1, 1, 1, 1),      # Fibonacci
+        #    #(1, 1, 0, 1),      # Fibonacci starting from 0,1
+        #    (1, 1, 2, 3),      # Fibonacci starting from 2,3
+        #    (1, 1, 1, 2),      # Fibonacci starting from 1,2
+        #]
 
     for alpha, beta, a, b in params:
         seq = generate_sequence(alpha, beta, a, b, length=10)
@@ -210,7 +225,9 @@ def test_model(model, X_mean, X_std, y_mean, y_std, alpha, beta, a, b, logTransf
 
     # Calculate relative errors (better for exponentially growing sequences)
     relative_errors = []
+    absolute_errors = []
     for true, pred in zip(test_sequence, predictions):
+        absolute_errors.append(abs(float(true - pred)))
         if true != 0:
             rel_error = (abs(true - pred) / true) * 100
             relative_errors.append(float(rel_error))
@@ -218,6 +235,7 @@ def test_model(model, X_mean, X_std, y_mean, y_std, alpha, beta, a, b, logTransf
             relative_errors.append(0.0)
 
     #print(f"Relative Error (%): {[round(x, 1) for x in relative_errors]}")
+    print("Absolute Error (%):\t" + "\t".join(f"{x:.1f}" for x in absolute_errors))
     print("Relative Error (%):\t" + "\t".join(f"{x:.1f}" for x in relative_errors))
 
 def visualize_training(losses):

@@ -69,6 +69,12 @@ Examples:
 
 # Test without saving
 ./sequence_predictor.py --logtx --params 2,2,1,1 --no-save
+
+# Fibonacci behaviour, but different starting points:
+./sequence_predictor.py --force --visual --epoch 10000
+./sequence_predictor.py  --param 1,1,0,1
+./sequence_predictor.py  --param 1,1,0,2
+./sequence_predictor.py  --param 1,1,1,3
 ```
 
 ### Fedora 42:
