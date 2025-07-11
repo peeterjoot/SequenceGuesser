@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import argparse
 import sys
 import os
+import json
 import os.path
 from pathlib import Path
 import warnings
@@ -35,7 +36,7 @@ class SequencePredictor(nn.Module):
         x = self.fc4(x)
         return x
 
-def generate_sequence(alpha, beta, a, b, length=12):
+def generate_sequence(alpha, beta, a, b, length):
     """Generate a sequence following f_k = α * f_{k-1} + β * f_{k-2}"""
     sequence = [float(a), float(b)]
     for k in range(2, length):
@@ -55,11 +56,7 @@ def create_dataset(sequences, window_size=2):
             y.append(seq[i+window_size])
     return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32)
 
-def train_model(epochs, logTransformation):
-    # Generate training data - focus on similar patterns to your example
-    print("Generating training data...")
-    sequences = []
-
+def training_params(logTransformation):
     if logTransformation:
         params = [
             (2, 3, 1, 2),      # Your exact example
@@ -105,12 +102,26 @@ def train_model(epochs, logTransformation):
         #    (1, 1, 2, 3),      # Fibonacci starting from 2,3
         #    (1, 1, 1, 2),      # Fibonacci starting from 1,2
         #]
+    return params
+
+def generate_sequences(logTransformation, seqlen):
+    sequences = []
+
+    params = training_params(logTransformation)
 
     for alpha, beta, a, b in params:
-        seq = generate_sequence(alpha, beta, a, b, length=10)
+        seq = generate_sequence(alpha, beta, a, b, seqlen)
         if len(seq) >= 5:  # Need at least 5 points for training
             sequences.append(seq)
             print(f"α={alpha}, β={beta}, a={a}, b={b}: {seq}")
+
+    return sequences
+
+def train_model(epochs, logTransformation, seqlen):
+    # Generate training data - focus on similar patterns to your example
+    print("Generating training data...")
+
+    sequences = generate_sequences(logTransformation, seqlen)
 
     # Create dataset
     X, y = create_dataset(sequences)
@@ -175,13 +186,11 @@ def train_model(epochs, logTransformation):
 
     return model, X_mean, X_std, y_mean, y_std, losses
 
-def test_model(model, X_mean, X_std, y_mean, y_std, alpha, beta, a, b, logTransformation):
+def test_model(model, X_mean, X_std, y_mean, y_std, alpha, beta, a, b, logTransformation, seqlen, asjson):
     """Test the model on your specific example"""
     print(f"\nTesting on α={alpha}, β={beta}, a={a}, b={b}...")
 
-    test_sequence = generate_sequence(alpha, beta, a, b, length=10)
-    #print(f"True sequence: {test_sequence}")
-    print("True sequence:\t\t" + "\t".join(f"{x:.1f}" for x in test_sequence))
+    test_sequence = generate_sequence(alpha, beta, a, b, seqlen)
 
     # Test predictions
     model.eval()
@@ -220,9 +229,6 @@ def test_model(model, X_mean, X_std, y_mean, y_std, alpha, beta, a, b, logTransf
 
             predictions.append(pred)
 
-    #print(f"Predicted:    {[round(float(x), 1) for x in predictions]}")
-    print("Predicted:\t\t" + "\t".join(f"{x:.1f}" for x in predictions))
-
     # Calculate relative errors (better for exponentially growing sequences)
     relative_errors = []
     absolute_errors = []
@@ -234,9 +240,43 @@ def test_model(model, X_mean, X_std, y_mean, y_std, alpha, beta, a, b, logTransf
         else:
             relative_errors.append(0.0)
 
-    #print(f"Relative Error (%): {[round(x, 1) for x in relative_errors]}")
-    print("Absolute Error (%):\t" + "\t".join(f"{x:.1f}" for x in absolute_errors))
-    print("Relative Error (%):\t" + "\t".join(f"{x:.1f}" for x in relative_errors))
+    #print(f'"α={alpha}, β={beta}, a={a}, b={b}...')
+    #print("True:\t\t" + "\t".join(f"{x:.1f}" for x in test_sequence))
+    #print("Predicted:\t\t" + "\t".join(f"{x:.1f}" for x in predictions))
+    #print("Absolute Error (%):\t" + "\t".join(f"{x:.1f}" for x in absolute_errors))
+    #print("Relative Error (%):\t" + "\t".join(f"{x:.1f}" for x in relative_errors))
+
+    if asjson:
+
+        #print(f"Type of test_sequence: {type(test_sequence)}")
+        #for e in test_sequence:
+        #    print(f"test_sequence element type: {type(e)}")
+        #print(f"Type of predictions: {type(predictions)}")
+        #for e in predictions:
+        #    print(f"predictions element type: {type(e)}")
+
+        js = {
+            "alpha": float(alpha),
+            "beta": float(beta),
+            "a": float(a),
+            "b": float(b),
+            "test_sequence": test_sequence,
+            "predictions": [float(e) for e in predictions]    # convert predictions[2:10] from np.float to float
+        }
+
+        return js
+    else:
+        print(f"\n{'Step':<4} {'True':<8} {'Predicted':<10} {'Absolute Error %':<20} {'Relative Error %':<20}")
+        print("-" * 64)
+        total_abserr = 0
+        total_relerr = 0
+        for i, (true, pred, abserr, relerr) in enumerate(zip(test_sequence, predictions, absolute_errors, relative_errors)):
+            print(f"{i:<4} {true:<8.1f} {pred:<10.1f} {abserr:<20.1f} {relerr:<20.1f}")
+            total_abserr += abserr
+            total_relerr += relerr
+
+        print( f"\nTotal absolute error: {total_abserr}" )
+        print( f"Total relative error: {total_relerr}" )
 
 def visualize_training(losses):
     """Plot training loss"""
@@ -302,7 +342,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Sequence Predictor')
 
     # Boolean flags
-    parser.add_argument('--visualize', '-v', action='store_true',
+    parser.add_argument('--loss-plot', '-v', action='store_true',
                        help='Show training loss plot')
     parser.add_argument('--logtx', '-g', action='store_true', default=False,
                        help='Use Log transformation')
@@ -310,6 +350,10 @@ if __name__ == "__main__":
                        help='Save the trained model (default: True)')
     parser.add_argument('--no-save', action='store_true',
                        help='Do not save the model')
+    parser.add_argument('--all', action='store_true',
+                       help='Run against all training sequences.')
+    parser.add_argument('--json', action='store_true',
+                       help='Output test data as json.')
     #parser.add_argument('--verbose', action='store_true',
     #                   help='Enable verbose output')
     parser.add_argument('--params', type=parse_params, default=[1, 1, 1, 1],
@@ -319,6 +363,8 @@ if __name__ == "__main__":
     # Other parameters
     parser.add_argument('--epochs', type=int, default=2000,
                        help='Number of training epochs')
+    parser.add_argument('--seqlen', type=int, default=10,
+                       help='Sequence length (for training and/or testing.)  Default is 10.')
     parser.add_argument('--model-file', type=str, default='model.pth',
                        help='Model file path')
 
@@ -352,16 +398,35 @@ if __name__ == "__main__":
         model, X_mean, X_std, y_mean, y_std = load_model(args.model_file)
     else:
         # Train the model
-        model, X_mean, X_std, y_mean, y_std, losses = train_model(args.epochs, args.logtx)
+        model, X_mean, X_std, y_mean, y_std, losses = train_model(args.epochs, args.logtx, args.seqlen)
         print("\nTraining complete!")
 
     # Test the model
-    alpha, beta, a, b = args.params
-    test_model(model, X_mean, X_std, y_mean, y_std, alpha, beta, a, b, args.logtx)
+    jsdata = []
+    if args.all:
+        params = training_params(args.logtx);
+
+        for alpha, beta, a, b in params:
+            if args.json:
+                js = test_model(model, X_mean, X_std, y_mean, y_std, alpha, beta, a, b, args.logtx, args.seqlen, 1)
+                jsdata.append( js )
+            else:
+                test_model(model, X_mean, X_std, y_mean, y_std, alpha, beta, a, b, args.logtx, args.seqlen, 0)
+    else:
+        alpha, beta, a, b = args.params
+        if args.json:
+            js = test_model(model, X_mean, X_std, y_mean, y_std, alpha, beta, a, b, args.logtx, args.seqlen, 1)
+            jsdata.append( js )
+        else:
+            test_model(model, X_mean, X_std, y_mean, y_std, alpha, beta, a, b, args.logtx, args.seqlen, 0)
+
+    if jsdata and args.json:
+        with open("data.json", "w") as f:
+            json.dump(jsdata, f, indent=4)
 
     if losses is not None:
         # Visualize training (optional)
-        if args.visualize:
+        if args.loss_plot:
             visualize_training(losses)
 
         # Save the model
